@@ -125,12 +125,11 @@ class VideoGenerationService:
                 
                 enhanced_sections.append({
                     "voiceover": voiceover,
-                    "scenes": enhanced_scenes
+                    "scenes": enhanced_scenes,
+                      "background_music": background_music
                 })
 
-                enhanced_sections.append({
-                    "background_music": background_music
-                })
+              
             
             return {
                 "enhanced_script": {
