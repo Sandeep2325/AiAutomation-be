@@ -1,11 +1,11 @@
-from openai import OpenAI
+from openai import AsyncOpenAI
 from app.core.config import settings
 from typing import Optional, List, Dict, Any
 import json
 
 class OpenAIService:
     def __init__(self):
-        self.client = OpenAI(api_key=settings.OPENAI_API_KEY)
+        self.client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
         self.model = settings.OPENAI_MODEL
         self.max_tokens = settings.OPENAI_MAX_TOKENS
         self.temperature = settings.OPENAI_TEMPERATURE
@@ -52,7 +52,7 @@ class OpenAIService:
         )
         return response.data[0].embedding
 
-    def generate_video_script(
+    async def generate_video_script(
         self,
         product_name: str,
         product_description: str,
@@ -62,10 +62,11 @@ class OpenAIService:
         brand_name: str = "",
         tone: str = "professional and inspiring",
         ad_type: str = "product showcase",
+        variations_no: int = 1,
         model: Optional[str] = "gpt-4.1-nano"
-    ) -> Dict[str, Any]:
+    ) -> List[Dict[str, Any]]:
         """
-        Generate a structured video script in JSON format using OpenAI.
+        Generate multiple variations of structured video scripts in JSON format using OpenAI.
         """
         script_prompt = f"""
 You're a professional video scriptwriter specializing in product marketing.
@@ -152,28 +153,26 @@ Return the keywords as a JSON array of strings.
         """
 
         try:
-            # Generate script
-            script_response = self.client.chat.completions.create(
-                model=model,
-                messages=[{"role": "user", "content": script_prompt}],
-                temperature=0.7
-            )
-            script_content = script_response.choices[0].message.content.strip()
+            # Generate multiple variations concurrently
+            script_tasks = []
+            for i in range(variations_no):
+                # Add variation number to prompt for diversity
+                variation_prompt = f"{script_prompt}\n\nThis is variation {i+1} of {variations_no}. Please ensure this variation is unique and different from other variations."
+                script_tasks.append(
+                    self.client.chat.completions.create(
+                        model=model,
+                        messages=[{"role": "user", "content": variation_prompt}],
+                        temperature=0.7 + (i * 0.1)  # Increase temperature for each variation
+                    )
+                )
 
-            # Generate keywords
-            keywords_response = self.client.chat.completions.create(
+            # Generate keywords once as they can be shared across variations
+            keywords_response = await self.client.chat.completions.create(
                 model=model,
                 messages=[{"role": "user", "content": keywords_prompt}],
                 temperature=0.7
             )
             keywords_content = keywords_response.choices[0].message.content.strip()
-
-            # Parse script
-            if script_content.startswith("```json"):
-                script_content = script_content.split("```json")[1].split("```")[0].strip()
-            elif script_content.startswith("```"):
-                script_content = script_content.split("```")[1].split("```")[0].strip()
-            script_data = json.loads(script_content)
 
             # Parse keywords
             if keywords_content.startswith("```json"):
@@ -182,12 +181,27 @@ Return the keywords as a JSON array of strings.
                 keywords_content = keywords_content.split("```")[1].split("```")[0].strip()
             keywords = json.loads(keywords_content)
 
-            return {
-                "voiceover_sections": script_data["voiceover_sections"],
-                "stock_footage_keywords": keywords
-            }
+            # Process all script variations
+            results = []
+            for script_task in script_tasks:
+                script_response = await script_task
+                script_content = script_response.choices[0].message.content.strip()
+
+                # Parse script
+                if script_content.startswith("```json"):
+                    script_content = script_content.split("```json")[1].split("```")[0].strip()
+                elif script_content.startswith("```"):
+                    script_content = script_content.split("```")[1].split("```")[0].strip()
+                script_data = json.loads(script_content)
+
+                results.append({
+                    "voiceover_sections": script_data["voiceover_sections"],
+                    "stock_footage_keywords": keywords
+                })
+
+            return results
 
         except Exception as e:
-            raise Exception(f"Error generating video script: {str(e)}")
+            raise Exception(f"Error generating video scripts: {str(e)}")
 
 openai_service = OpenAIService() 

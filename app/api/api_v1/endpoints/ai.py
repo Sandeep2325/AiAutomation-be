@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from typing import Optional, Dict, Any, List
 from app.services.openai_service import openai_service
+from app.services.video_generation_service import video_generation_service
 
 router = APIRouter()
 
@@ -26,19 +27,30 @@ class VoiceoverSection(BaseModel):
     voiceover: str
     scenes: List[Scene]
 
-class VideoScriptResponse(BaseModel):
-    voiceover_sections: List[VoiceoverSection]
-    stock_footage_keywords: List[str]
-
 class VideoScriptRequest(BaseModel):
     product_name: str
     product_description: str
     duration: str = "60 seconds"
-    target_audience: str
+    target_audience: str = "general audience"
     language: str = "English"
-    brand_name: str
-    tone: Optional[str] = "professional and inspiring"
-    ad_type: Optional[str] = "product showcase"
+    brand_name: str = ""
+    tone: str = "professional and inspiring"
+    ad_type: str = "product showcase"
+    variations_no: int = 1
+
+class VideoScriptVariation(BaseModel):
+    voiceover_sections: List[Dict[str, Any]]
+    stock_footage_keywords: List[str]
+
+class VideoScriptResponse(BaseModel):
+    variations: List[VideoScriptVariation]
+
+class VideoGenerationRequest(BaseModel):
+    voiceover_sections: List[Dict[str, Any]]
+    stock_footage_keywords: List[str]
+
+class VideoGenerationResponse(BaseModel):
+    enhanced_script: Dict[str, Any]
 
 @router.post("/completion", response_model=Dict[str, Any])
 async def create_completion(request: CompletionRequest):
@@ -71,12 +83,12 @@ async def create_embeddings(request: EmbeddingRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/video-script", response_model=VideoScriptResponse)
-def generate_video_script(request: VideoScriptRequest):
+async def generate_video_script(request: VideoScriptRequest):
     """
-    Generate a video script using OpenAI's API
+    Generate multiple variations of video scripts for a product.
     """
     try:
-        script = openai_service.generate_video_script(
+        variations = await openai_service.generate_video_script(
             product_name=request.product_name,
             product_description=request.product_description,
             duration=request.duration,
@@ -85,7 +97,19 @@ def generate_video_script(request: VideoScriptRequest):
             brand_name=request.brand_name,
             tone=request.tone,
             ad_type=request.ad_type,
+            variations_no=request.variations_no
         )
-        return script
+        return VideoScriptResponse(variations=variations)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/generate-video", response_model=VideoGenerationResponse)
+async def generate_video(request: VideoGenerationRequest):
+    """
+    Generate video content from script using Getty Images and Eleven Labs
+    """
+    try:
+        result = await video_generation_service.generate_video_content(request.dict())
+        return VideoGenerationResponse(**result)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) 
