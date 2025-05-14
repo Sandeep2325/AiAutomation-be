@@ -52,50 +52,138 @@ class OpenAIService:
         )
         return response.data[0].embedding
 
-    async def generate_video_script(
+    def generate_video_script(
         self,
-        topic: str,
+        product_name: str,
+        product_description: str,
         duration: str = "60 seconds",
+        target_audience: str = "general audience",
+        language: str = "English",
+        brand_name: str = "",
         tone: str = "professional and inspiring",
-        model: str = "gpt-4"
-    ) -> List[Dict[str, Any]]:
+        model: str = "gpt-4.1-nano"
+    ) -> Dict[str, Any]:
         """
         Generate a structured video script in JSON format using OpenAI.
         """
-        prompt = f"""
-You're a professional video scriptwriter.
+        script_prompt = f"""
+You're a professional video scriptwriter specializing in product marketing.
 
-Generate a complete video script in JSON format for a {duration} promotional video about {topic}.
-The tone should be {tone}.
+Generate a complete video script in JSON format for a {duration} promotional video about {product_name}.
+Product Description: {product_description}
+Target Audience: {target_audience}
+Language: {language}
+Brand Name: {brand_name}
+Tone: {tone}
 
-Each scene should include the following fields:
-- scene (number)
+The script should be organized into voiceover sections, where each section can have multiple scenes.
+Each voiceover section should include:
+- voiceover (the narration text)
+- scenes (array of scenes that play during this voiceover)
+
+Each scene should include:
+- scene_number (sequential number across all scenes)
 - visual (visual description of the scene)
-- narration (voiceover line)
-- caption (on-screen text)
+- caption (on-screen text in {language})
 - music_sfx (background music or sound effects)
+- search_queries (array of 3-5 specific search queries for finding stock footage for this scene)
 
-Return the result as a valid JSON array of scene objects.
+Guidelines for scenes:
+1. Each voiceover section can have 1-3 scenes
+2. Scenes should flow naturally with the voiceover
+3. Use visual transitions between scenes
+4. Consider timing and pacing
+5. Ensure scenes support the voiceover message
+
+Guidelines for search_queries:
+1. Each query should be specific to the scene's visual needs
+2. Include both broad and specific terms
+3. Consider camera angles and movements
+4. Include relevant props or elements
+5. Consider lighting and atmosphere
+6. Use terms commonly found in stock footage websites
+
+Example structure:
+{{
+    "voiceover_sections": [
+        {{
+            "voiceover": "Welcome to the future of home living",
+            "scenes": [
+                {{
+                    "scene_number": 1,
+                    "visual": "Wide shot of modern home exterior",
+                    "caption": "SmartHome Hub",
+                    "music_sfx": "Modern, tech-inspired background music",
+                    "search_queries": ["modern home exterior", "contemporary architecture", "smart home"]
+                }},
+                {{
+                    "scene_number": 2,
+                    "visual": "Close-up of smart door lock",
+                    "caption": "Secure & Connected",
+                    "music_sfx": "Continuing background music",
+                    "search_queries": ["smart door lock", "security technology", "home automation"]
+                }}
+            ]
+        }}
+    ]
+}}
+
+Return the result as a valid JSON object with voiceover_sections array.
 Ensure the output is directly parseable JSON.
         """
 
+        keywords_prompt = f"""
+Based on the following product information, generate at least 4 relevant keywords for stock footage selection:
+
+Product: {product_name}
+Description: {product_description}
+Target Audience: {target_audience}
+Tone: {tone}
+
+The keywords should be:
+1. Specific and relevant to the product
+2. Useful for finding stock footage
+3. Include both product-specific and emotional/atmospheric terms
+4. Be in {language}
+
+Return the keywords as a JSON array of strings.
+        """
+
         try:
-            response = await self.client.chat.completions.create(
+            # Generate script
+            script_response = self.client.chat.completions.create(
                 model=model,
-                messages=[{"role": "user", "content": prompt}],
+                messages=[{"role": "user", "content": script_prompt}],
                 temperature=0.7
             )
+            script_content = script_response.choices[0].message.content.strip()
 
-            content = response.choices[0].message.content.strip()
+            # Generate keywords
+            keywords_response = self.client.chat.completions.create(
+                model=model,
+                messages=[{"role": "user", "content": keywords_prompt}],
+                temperature=0.7
+            )
+            keywords_content = keywords_response.choices[0].message.content.strip()
 
-            # Fix triple backticks if any
-            if content.startswith("```json"):
-                content = content.split("```json")[1].split("```")[0].strip()
-            elif content.startswith("```"):
-                content = content.split("```")[1].split("```")[0].strip()
+            # Parse script
+            if script_content.startswith("```json"):
+                script_content = script_content.split("```json")[1].split("```")[0].strip()
+            elif script_content.startswith("```"):
+                script_content = script_content.split("```")[1].split("```")[0].strip()
+            script_data = json.loads(script_content)
 
-            script_json = json.loads(content)
-            return script_json
+            # Parse keywords
+            if keywords_content.startswith("```json"):
+                keywords_content = keywords_content.split("```json")[1].split("```")[0].strip()
+            elif keywords_content.startswith("```"):
+                keywords_content = keywords_content.split("```")[1].split("```")[0].strip()
+            keywords = json.loads(keywords_content)
+
+            return {
+                "voiceover_sections": script_data["voiceover_sections"],
+                "stock_footage_keywords": keywords
+            }
 
         except Exception as e:
             raise Exception(f"Error generating video script: {str(e)}")

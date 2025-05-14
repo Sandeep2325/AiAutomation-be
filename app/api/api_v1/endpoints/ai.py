@@ -15,11 +15,30 @@ class EmbeddingRequest(BaseModel):
     text: str
     model: Optional[str] = None
 
+class Scene(BaseModel):
+    scene_number: int
+    visual: str
+    caption: str
+    music_sfx: str
+    search_queries: List[str]
+
+class VoiceoverSection(BaseModel):
+    voiceover: str
+    scenes: List[Scene]
+
+class VideoScriptResponse(BaseModel):
+    voiceover_sections: List[VoiceoverSection]
+    stock_footage_keywords: List[str]
+
 class VideoScriptRequest(BaseModel):
-    topic: str
-    duration: Optional[str] = "60 seconds"
+    product_name: str
+    product_description: str
+    duration: str = "60 seconds"
+    target_audience: str
+    language: str = "English"
+    brand_name: str
     tone: Optional[str] = "professional and inspiring"
-    model: Optional[str] = "gpt-4"
+    model: Optional[str] = "gpt-4.1-nano"
 
 @router.post("/completion", response_model=Dict[str, Any])
 async def create_completion(request: CompletionRequest):
@@ -51,15 +70,19 @@ async def create_embeddings(request: EmbeddingRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/video-script", response_model=List[Dict[str, Any]])
-async def generate_video_script(request: VideoScriptRequest):
+@router.post("/video-script", response_model=VideoScriptResponse)
+def generate_video_script(request: VideoScriptRequest):
     """
     Generate a video script using OpenAI's API
     """
     try:
-        script = await openai_service.generate_video_script(
-            topic=request.topic,
+        script = openai_service.generate_video_script(
+            product_name=request.product_name,
+            product_description=request.product_description,
             duration=request.duration,
+            target_audience=request.target_audience,
+            language=request.language,
+            brand_name=request.brand_name,
             tone=request.tone,
             model=request.model
         )
