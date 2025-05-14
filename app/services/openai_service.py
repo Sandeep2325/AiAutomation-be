@@ -61,7 +61,8 @@ class OpenAIService:
         language: str = "English",
         brand_name: str = "",
         tone: str = "professional and inspiring",
-        model: str = "gpt-4.1-nano"
+        ad_type: str = "product showcase",
+        model: Optional[str] = "gpt-4.1-nano"
     ) -> Dict[str, Any]:
         """
         Generate a structured video script in JSON format using OpenAI.
@@ -69,12 +70,13 @@ class OpenAIService:
         script_prompt = f"""
 You're a professional video scriptwriter specializing in product marketing.
 
-Generate a complete video script in JSON format for a {duration} promotional video about {product_name}.
+Generate a complete video script in JSON format for a {duration} {ad_type} promotional video about {product_name}.
 Product Description: {product_description}
 Target Audience: {target_audience}
 Language: {language}
 Brand Name: {brand_name}
 Tone: {tone}
+Ad Type: {ad_type}
 
 The script should be organized into voiceover sections, where each section can have multiple scenes.
 Each voiceover section should include:

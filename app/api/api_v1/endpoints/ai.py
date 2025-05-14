@@ -38,7 +38,7 @@ class VideoScriptRequest(BaseModel):
     language: str = "English"
     brand_name: str
     tone: Optional[str] = "professional and inspiring"
-    model: Optional[str] = "gpt-4.1-nano"
+    ad_type: Optional[str] = "product showcase"
 
 @router.post("/completion", response_model=Dict[str, Any])
 async def create_completion(request: CompletionRequest):
@@ -84,7 +84,7 @@ def generate_video_script(request: VideoScriptRequest):
             language=request.language,
             brand_name=request.brand_name,
             tone=request.tone,
-            model=request.model
+            ad_type=request.ad_type,
         )
         return script
     except Exception as e:
