@@ -18,8 +18,8 @@ class VideoGenerationService:
             return {
                 "id": "demo",
                 "title": "Demo Footage",
-                "preview_url": "https://example.com/demo-preview.jpg",
-                "download_url": "https://example.com/demo-download.jpg",
+                "preview_url": "https://d25u9hypq51glx.cloudfront.net/arole/3cb7e03d-a95c-4102-86b8-20c5bc8630ed/video/d0b41e2b-76a0-4be6-8bfa-1115b3707f9f/video.mp4",
+                "download_url": "https://d25u9hypq51glx.cloudfront.net/arole/3cb7e03d-a95c-4102-86b8-20c5bc8630ed/video/d0b41e2b-76a0-4be6-8bfa-1115b3707f9f/video.mp4",
                 "note": "Getty Images API key not configured"
             }
 
@@ -59,7 +59,7 @@ class VideoGenerationService:
         """
         if not self.eleven_labs_api_key:
             return {
-                "url": "https://example.com/demo-voice.mp3",
+                "url": "https://d25u9hypq51glx.cloudfront.net/audio_projects/whisper/3cb7e03d-a95c-4102-86b8-20c5bc8630ed/848380575464/audio.mp3",
                 "text": text,
                 "note": "Eleven Labs API key not configured"
             }
@@ -103,7 +103,11 @@ class VideoGenerationService:
             for section in script["voiceover_sections"]:
                 # Generate voiceover
                 voiceover = await self.generate_voiceover(section["voiceover"])
-                
+                background_music = {
+                    "url": "https://d25u9hypq51glx.cloudfront.net/image_projects/3cb7e03d-a95c-4102-86b8-20c5bc8630ed/assets/audio/13592a75-3fa1-42f8-8b21-cc72b3bd54ef/audio.mp3",
+                    "text": "Background Music",
+                    "note": "Eleven Labs API key not configured"
+                }
                 # Get footage for each scene
                 enhanced_scenes = []
                 for scene in section["scenes"]:
@@ -122,6 +126,10 @@ class VideoGenerationService:
                 enhanced_sections.append({
                     "voiceover": voiceover,
                     "scenes": enhanced_scenes
+                })
+
+                enhanced_sections.append({
+                    "background_music": background_music
                 })
             
             return {
